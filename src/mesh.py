@@ -17,17 +17,43 @@ QOS = 2
 
 mqtt_client = mqtt.Client(client_id=MQTT_CLIENT_ID)
 
+last_message = ""
 def on_message(client, userdata, msg):
-	print(f"Received message on topic {msg.topic} with payload {msg.payload}")
-	message = json.loads(msg.payload.decode("utf-8")).get("payload", {}).get("text", "")
-	print(f"{message}")
+	global last_message
+	try:
+		payload_str = msg.payload.decode("utf-8")
+		print(f"Received message on topic {msg.topic} with payload: {repr(payload_str)}")
 
-	lock = FileLock('msg_to_telegram.lock')
-	print("Acquiring lock to write to msg_to_telegram.txt.")
-	with lock:
-		with open('msg_to_telegram.txt', 'w') as f:
-			f.write(message)
-			print("Message written to msg_to_telegram.txt.")
+		payload_dict = json.loads(payload_str)
+
+		if not isinstance(payload_dict, dict):
+			print(f"Error: Parsed payload is not a dictionary: {payload_dict}")
+			return
+
+		message = payload_dict.get("payload", {})
+		if isinstance(message, str): 
+			text = message
+		elif isinstance(message, dict):
+			text = message.get("text", "")
+		else:
+			print(f"Unexpected payload format: {message}")
+			return
+
+		print(f"Extracted message: {text}")
+
+		lock = FileLock("msg_to_telegram.lock")
+		print("Acquiring lock to write to msg_to_telegram.txt.")
+		with lock:
+			with open("msg_to_telegram.txt", "w") as f:
+				if last_message != text:
+					last_message = text
+					f.write(text)
+					print("Message written to msg_to_telegram.txt.")
+
+	except json.JSONDecodeError as e:
+		print(f"JSON decoding error: {e}")
+	except Exception as e:
+		print(f"Unexpected error: {e}")
 
 def on_connect(client, userdata, flags, rc):
 	print(f"Connected to MQTT Broker with result code {rc}")
@@ -45,18 +71,10 @@ def check_for_message():
 				if text:
 					timestamp = int(time.time())
 					json_msg = {
-						"channel": 1,
 						"from": 3928243248,
-						"hop_start": 3,
-						"hops_away": 0,
-						"id": 1650455019,
-						"payload": {
-							"text": text
-						},
-						"sender": "!ea243c30",
-						"timestamp": timestamp,
-						"to": 4294967295,
-						"type": "text"
+						"payload": text,
+						"channel" : 0,
+						"type": "sendtext"
 					}
 
 					message = json.dumps(json_msg).encode("utf-8")

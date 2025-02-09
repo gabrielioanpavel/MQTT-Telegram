@@ -21,42 +21,43 @@ TOPIC_ID = int(os.getenv('TOPIC_ID'))
 if not TOPIC_ID:
 	raise ValueError("Topic ID not provided")
 
+last_message = ""
 async def check_for_message(app):
-    last_message = ""
+	global last_message
+	while True:
+		lock = FileLock('msg_to_telegram.lock')
+		with lock:
+			print("Acquiring lock to check message file.")
+			try:
+				with open('msg_to_telegram.txt', 'r') as f:
+					message = f.read().strip()
 
-    while True:
-        lock = FileLock('msg_to_telegram.lock')
-        with lock:
-            print("Acquiring lock to check message file.")
-            try:
-                with open('msg_to_telegram.txt', 'r') as f:
-                    message = f.read().strip()
+					print(f"Read message: {repr(message)}")
+					print(f"Last message before check: {repr(last_message)}")
 
-                    print(f"Read message: {repr(message)}")
-                    print(f"Last message before check: {repr(last_message)}")
+					if message:
+						if last_message != message:
+							print(f"Last message is different from current message. Updating and sending.")
+							last_message = message
+							try:
+								await app.bot.send_message(chat_id=CHAT_ID, message_thread_id=TOPIC_ID, text=message)
+								print("Message sent successfully.")
+							except Exception as e:
+								print(f"Error sending message: {e}")
+						else:
+							print("Message is the same as the last one. Not sending.")
+					else:
+						print("Message in the file is empty. Skipping send.")
 
-                    if message:
-                        if last_message != message:
-                            print(f"Last message is different from current message. Updating and sending.")
-                            last_message = message
-                            try:
-                                await app.bot.send_message(chat_id=CHAT_ID, message_thread_id=TOPIC_ID, text=message)
-                                print("Message sent successfully.")
-                            except Exception as e:
-                                print(f"Error sending message: {e}")
-                        else:
-                            print("Message is the same as the last one. Not sending.")
-                    else:
-                        print("Message in the file is empty. Skipping send.")
+			except Exception as e:
+				print(f"Error reading message file: {e}")
 
-            except Exception as e:
-                print(f"Error reading message file: {e}")
+			print("Clearing message file.")
+			with open('msg_to_telegram.txt', 'w') as f_clear:
+				f_clear.write("")
 
-            print("Clearing message file.")
-            with open('msg_to_telegram.txt', 'w') as f_clear:
-                f_clear.write("")
-
-        await asyncio.sleep(2)
+		await asyncio.sleep(2)
+		
 async def handle_message(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
 	if update.message.message_thread_id == TOPIC_ID:
 		text = update.message.text
