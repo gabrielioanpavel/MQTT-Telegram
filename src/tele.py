@@ -35,7 +35,6 @@ async def check_for_message(app):
 					if message:
 						# Prevent the bot from repeating the message sent by the user in the Telegram chat
 						if user_message != message:
-							user_message = message
 							try:
 								await app.bot.send_message(chat_id=CHAT_ID, message_thread_id=TOPIC_ID, text=message)
 								print("Message sent successfully: " + message)
@@ -61,7 +60,7 @@ async def handle_message(update: telegram.Update, context: telegram.ext.ContextT
 		with lock:
 			with open('msg_to_mqtt.txt', 'w') as f:
 				f.write(text)
-			print("Message written to MQTT file :" + text)
+			print("Message written to MQTT file: " + text)
 
 if __name__ == '__main__':
 	print("Initializing bot...")

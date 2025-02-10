@@ -43,10 +43,8 @@ def on_message(client, userdata, msg):
 		lock = FileLock("msg_to_telegram.lock")
 		with lock:
 			with open("msg_to_telegram.txt", "w") as f:
-				if last_message != text:
-					last_message = text
-					f.write(text)
-					print("Message written to Telegram file: " + text)
+				f.write(text)
+				print("Message written to Telegram file: " + text)
 
 	except Exception as e:
 		print(f"Unexpected error: {e}")
