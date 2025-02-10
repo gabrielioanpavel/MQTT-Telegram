@@ -21,9 +21,9 @@ TOPIC_ID = int(os.getenv('TOPIC_ID'))
 if not TOPIC_ID:
 	raise ValueError("Topic ID not provided")
 
-last_message = ""
+user_message = ""
 async def check_for_message(app):
-	global last_message
+	global user_message
 	while True:
 		lock = FileLock('msg_to_telegram.lock')
 		with lock:
@@ -33,12 +33,12 @@ async def check_for_message(app):
 					message = f.read().strip()
 
 					print(f"Read message: {repr(message)}")
-					print(f"Last message before check: {repr(last_message)}")
+					print(f"User message: {repr(user_message)}")
 
 					if message:
-						if last_message != message:
+						if user_message != message:
 							print(f"Last message is different from current message. Updating and sending.")
-							last_message = message
+							user_message = message
 							try:
 								await app.bot.send_message(chat_id=CHAT_ID, message_thread_id=TOPIC_ID, text=message)
 								print("Message sent successfully.")
@@ -59,8 +59,10 @@ async def check_for_message(app):
 		await asyncio.sleep(2)
 		
 async def handle_message(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
+	global user_message
 	if update.message.message_thread_id == TOPIC_ID:
 		text = update.message.text
+		user_message = text
 		print(f"Received message: {text}")
 		
 		lock = FileLock('msg_to_mqtt.lock')
