@@ -9,7 +9,8 @@ load_dotenv()
 
 MQTT_BROKER = os.getenv('MQTT_BROKER')
 MQTT_PORT = int(os.getenv('MQTT_PORT'))
-MQTT_TOPIC = os.getenv("MQTT_TOPIC")
+MQTT_TOPIC_SUBSCRIBE = os.getenv("MQTT_TOPIC_SUBSCRIBE")
+MQTT_TOPIC_PUBLISH = os.getenv("MQTT_TOPIC_PUBLISH")
 MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID")
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
@@ -43,16 +44,17 @@ def on_message(client, userdata, msg):
 		lock = FileLock("msg_to_telegram.lock")
 		with lock:
 			with open("msg_to_telegram.txt", "w") as f:
-				f.write(text)
-				print("Message written to Telegram file: " + text)
+				if text:
+					f.write(text)
+					print("Message written to Telegram file: " + text)
 
 	except Exception as e:
 		print(f"Unexpected error: {e}")
 
 def on_connect(client, userdata, flags, rc):
 	print(f"Connected to MQTT Broker with result code {rc}")
-	print(f"Subscribing to topic {MQTT_TOPIC}.")
-	client.subscribe(MQTT_TOPIC)
+	print(f"Subscribing to topic {MQTT_TOPIC_SUBSCRIBE}.")
+	client.subscribe(MQTT_TOPIC_SUBSCRIBE)
 
 def check_for_message():
 	while True:
@@ -71,7 +73,7 @@ def check_for_message():
 					message = json.dumps(json_msg).encode("utf-8")
 
 					print(f"Publishing message: {message}")
-					mqtt_client.publish(MQTT_TOPIC, message, qos=QOS)
+					mqtt_client.publish(MQTT_TOPIC_PUBLISH, message, qos=QOS)
 
 			with open('msg_to_mqtt.txt', 'w') as f_clear:
 				f_clear.write('')
