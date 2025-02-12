@@ -1,4 +1,5 @@
 import os
+import re
 import paho.mqtt.client as mqtt
 import time
 from filelock import FileLock
@@ -11,6 +12,7 @@ MQTT_BROKER = os.getenv('MQTT_BROKER')
 MQTT_PORT = int(os.getenv('MQTT_PORT'))
 MQTT_TOPIC_SUBSCRIBE = os.getenv("MQTT_TOPIC_SUBSCRIBE")
 MQTT_TOPIC_PUBLISH = os.getenv("MQTT_TOPIC_PUBLISH")
+NODE_ID = int(re.search(r"!([0-9a-fA-F]+)$", MQTT_TOPIC_PUBLISH).group(1), 16)
 MQTT_CLIENT_ID = os.getenv("MQTT_CLIENT_ID")
 MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
@@ -31,7 +33,7 @@ def on_message(client, userdata, msg):
 
 		message = payload_dict.get("payload", {})
 
-		if isinstance(message, str): 
+		if isinstance(message, str):
 			text = message
 		elif isinstance(message, dict):
 			text = message.get("text", "")
@@ -63,10 +65,11 @@ def check_for_message():
 			with open('msg_to_mqtt.txt', 'r') as f:
 				text = f.read()
 				if text:
+					# Uncomment the "channel" field and change the value if needed
 					json_msg = {
-						"from": 3926530548,
+						"from": NODE_ID,
 						"payload": text,
-						"channel" : 0,
+						# "channel" : 0,
 						"type": "sendtext"
 					}
 
