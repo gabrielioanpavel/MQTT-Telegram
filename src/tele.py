@@ -21,9 +21,11 @@ if not TOPIC_ID:
 	raise ValueError("Topic ID not provided")
 
 user_message = ""
+last_message = ""
 
 async def check_for_message(app):
 	global user_message
+	global last_message
 
 	while True:
 		lock = FileLock('msg_to_telegram.lock')
@@ -34,8 +36,9 @@ async def check_for_message(app):
 
 					if message:
 						# Prevent the bot from repeating the message sent by the user in the Telegram chat
-						if user_message != message:
+						if user_message != message and last_message != message:
 							try:
+								last_message = message
 								await app.bot.send_message(chat_id=CHAT_ID, message_thread_id=TOPIC_ID, text=message)
 								print("Message sent successfully: " + message)
 							except Exception as e:
