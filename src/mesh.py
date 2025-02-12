@@ -64,7 +64,7 @@ def check_for_message():
 				text = f.read()
 				if text:
 					json_msg = {
-						"from": 3928243248,
+						"from": 3926530548,
 						"payload": text,
 						"channel" : 0,
 						"type": "sendtext"
