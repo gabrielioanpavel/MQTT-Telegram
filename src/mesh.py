@@ -97,3 +97,6 @@ if __name__ == '__main__':
 
 	print("Starting to check for messages to publish.")
 	check_for_message()
+
+# TODO 1: Have a single script that spawns the two processes and makes the IPC through pipes.
+# TODO 2: Make handler for SIGINT.
