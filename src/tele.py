@@ -40,7 +40,8 @@ async def check_for_message(app):
 
 					if message:
 						# Prevent the bot from repeating the message sent by the user in the Telegram chat
-						if user_message != message and last_message != message:
+						if user_message != message and last_message != message and \
+						"BOT: Test succes: " not in message:
 							try:
 								last_message = message
 								await app.bot.send_message(chat_id=CHAT_ID, message_thread_id=TOPIC_ID, text=message)
