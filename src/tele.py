@@ -21,6 +21,8 @@ if not TOPIC_ID:
 	raise ValueError("Topic ID not provided")
 
 KEYWORDS = os.getenv("KEYWORDS")
+if KEYWORDS == "":
+	KEYWORDS = None
 if KEYWORDS:
 	KEYWORDS = KEYWORDS.lower()
 
@@ -40,21 +42,21 @@ async def check_for_message(app):
 
 					if message:
 						# Prevent the bot from repeating the message sent by the user in the Telegram chat
-						if user_message != message and last_message != message and \
-						"BOT: Test succes: " not in message:
+						if user_message != message and last_message != message:
 							try:
 								last_message = message
 								await app.bot.send_message(chat_id=CHAT_ID, message_thread_id=TOPIC_ID, text=message)
 								print("Message sent successfully: " + message)
 
-								for word in message.split():
-									if word.lower() in KEYWORDS:
-										lock = FileLock('msg_to_mqtt.lock')
+								if KEYWORDS:
+									for word in message.split():
+										if word.lower() in KEYWORDS:
+											lock = FileLock('msg_to_mqtt.lock')
 
-										with lock:
-											with open('msg_to_mqtt.txt', 'w') as f:
-												f.write("BOT: Test success: " + message)
-										break
+											with lock:
+												with open('msg_to_mqtt.txt', 'w') as f:
+													f.write("BOT: Receptionat!")
+											break
 							except Exception as e:
 								print(f"Error sending message: {e}")
 			except Exception as e:
@@ -64,7 +66,7 @@ async def check_for_message(app):
 				f_clear.write("")
 
 		await asyncio.sleep(2)
-		
+
 async def handle_message(update: telegram.Update, context: telegram.ext.ContextTypes.DEFAULT_TYPE):
 	global user_message
 
