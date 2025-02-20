@@ -20,6 +20,10 @@ TOPIC_ID = int(os.getenv('TOPIC_ID'))
 if not TOPIC_ID:
 	raise ValueError("Topic ID not provided")
 
+KEYWORDS = os.getenv("KEYWORDS")
+if KEYWORDS:
+	KEYWORDS = KEYWORDS.lower()
+
 user_message = ""
 last_message = ""
 
@@ -41,6 +45,15 @@ async def check_for_message(app):
 								last_message = message
 								await app.bot.send_message(chat_id=CHAT_ID, message_thread_id=TOPIC_ID, text=message)
 								print("Message sent successfully: " + message)
+
+								for word in message.split():
+									if word.lower() in KEYWORDS:
+										lock = FileLock('msg_to_mqtt.lock')
+
+										with lock:
+											with open('msg_to_mqtt.txt', 'w') as f:
+												f.write("BOT: Test success: " + message)
+										break
 							except Exception as e:
 								print(f"Error sending message: {e}")
 			except Exception as e:
@@ -60,6 +73,7 @@ async def handle_message(update: telegram.Update, context: telegram.ext.ContextT
 		print(f"Received message: {text}")
 		
 		lock = FileLock('msg_to_mqtt.lock')
+
 		with lock:
 			with open('msg_to_mqtt.txt', 'w') as f:
 				f.write(text)
