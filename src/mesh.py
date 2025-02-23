@@ -2,9 +2,15 @@ import os
 import re
 import paho.mqtt.client as mqtt
 import time
+import locale
 from filelock import FileLock
 from dotenv import load_dotenv
 import json
+
+try:
+	locale.setlocale(locale.LC_ALL, "ro_RO.UTF-8")
+except locale.Error:
+	locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
 
 load_dotenv()
 
