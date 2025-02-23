@@ -4,8 +4,14 @@ import telegram
 import telegram.ext
 import telegram.error
 import asyncio
+import locale
 from filelock import FileLock
 
+try:
+	locale.setlocale(locale.LC_ALL, "ro_RO.UTF-8")
+except locale.Error:
+	locale.setlocale(locale.LC_ALL, "en_US.UTF-8")
+	
 load_dotenv()
 
 TOKEN = os.getenv("TOKEN")
