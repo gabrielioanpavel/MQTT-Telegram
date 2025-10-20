@@ -57,6 +57,7 @@ async def check_for_message(app):
 								print("Message sent successfully: " + message)
 
 								if KEYWORDS:
+									print("test")
 									if pattern.search(message):
 										lock = FileLock('msg_to_mqtt.lock')
 
