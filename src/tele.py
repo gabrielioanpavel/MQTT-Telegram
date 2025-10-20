@@ -64,7 +64,6 @@ async def check_for_message(app):
 										with lock:
 											with open('msg_to_mqtt.txt', 'w') as f:
 												f.write("iBOT: Receptionat!")
-										break
 							except Exception as e:
 								print(f"Error sending message: {e}")
 			except Exception as e:
