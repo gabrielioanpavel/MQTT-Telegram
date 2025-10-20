@@ -5,6 +5,7 @@ import telegram.ext
 import telegram.error
 import asyncio
 import locale
+import re
 from filelock import FileLock
 
 try:
@@ -55,14 +56,13 @@ async def check_for_message(app):
 								print("Message sent successfully: " + message)
 
 								if KEYWORDS:
-									for word in message.split():
-										if word.lower() in KEYWORDS:
-											lock = FileLock('msg_to_mqtt.lock')
+									if re.search(KEYWORDS, word, re.IGNORECASE):
+										lock = FileLock('msg_to_mqtt.lock')
 
-											with lock:
-												with open('msg_to_mqtt.txt', 'w') as f:
-													f.write("BOT: Receptionat!")
-											break
+										with lock:
+											with open('msg_to_mqtt.txt', 'w') as f:
+												f.write("iBOT: Receptionat!")
+										break
 							except Exception as e:
 								print(f"Error sending message: {e}")
 			except Exception as e:

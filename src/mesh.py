@@ -25,6 +25,7 @@ MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 QOS = 2
 
 mqtt_client = mqtt.Client(client_id=MQTT_CLIENT_ID)
+mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
 
 def on_message(client, userdata, msg):
 	try:
