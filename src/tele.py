@@ -27,11 +27,12 @@ TOPIC_ID = int(os.getenv('TOPIC_ID'))
 if not TOPIC_ID:
 	raise ValueError("Topic ID not provided")
 
+pattern = ""
 KEYWORDS = os.getenv("KEYWORDS")
 if KEYWORDS == "":
 	KEYWORDS = None
 if KEYWORDS:
-	KEYWORDS = KEYWORDS.lower()
+    pattern = re.compile(re.escape(KEYWORDS), re.IGNORECASE)
 
 user_message = ""
 last_message = ""
@@ -56,7 +57,7 @@ async def check_for_message(app):
 								print("Message sent successfully: " + message)
 
 								if KEYWORDS:
-									if re.search(KEYWORDS, word, re.IGNORECASE):
+									if pattern.search(message):
 										lock = FileLock('msg_to_mqtt.lock')
 
 										with lock:
