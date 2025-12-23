@@ -187,7 +187,7 @@ async def main():
     
     main_loop = asyncio.get_running_loop()
 
-    mqtt_client = mqtt.Client(client_id=MQTT_CLIENT_ID)
+    mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=MQTT_CLIENT_ID)
     mqtt_client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD)
     mqtt_client.on_connect = on_connect
     mqtt_client.on_message = on_message
