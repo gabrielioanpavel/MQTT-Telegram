@@ -203,8 +203,10 @@ async def main():
 
     logger.info("Initializing Telegram Bot...")
     app = Application.builder().token(TOKEN).build()
-    
     app.add_handler(MessageHandler(filters.TEXT, handle_telegram_message))
+
+    await app.initialize()
+    await app.start()
 
     asyncio.create_task(telegram_worker(app))
 
@@ -217,6 +219,8 @@ async def main():
         logger.info("Stopping...")
     finally:
         await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
         mqtt_client.loop_stop()
 
 if __name__ == '__main__':
