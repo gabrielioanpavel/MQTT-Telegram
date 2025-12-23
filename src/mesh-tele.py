@@ -74,7 +74,7 @@ def get_node_id(topic_pub):
         return int(match.group(1), 16)
     return 0
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, properties):
     logger.info(f"MQTT Connected (RC: {rc})")
     for ch in CHANNELS:
         logger.info(f"Subscribing to {ch['sub']}")
