@@ -58,7 +58,7 @@ main_loop = None
 
 def get_channel_by_sub(topic):
     for ch in CHANNELS:
-        if ch["sub"] == topic:
+        if mqtt.topic_matches_sub(ch["sub"], topic):
             return ch
     return None
 
