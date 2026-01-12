@@ -42,6 +42,75 @@ TOPIC_ID = int(os.getenv('TOPIC_ID_1'))
 
 KEYWORDS = os.getenv("KEYWORDS")
 KEYWORD_PATTERN = re.compile(re.escape(KEYWORDS), re.IGNORECASE) if KEYWORDS else None
+WX_PATTERN = re.compile(r"\b(wx|meteo)\b", re.IGNORECASE)
+IBOT_PATTERN = re.compile(r"\bibot\b", re.IGNORECASE)
+
+# Ignored/banned nodes from .env (completely ignored - no messages processed)
+IGNORED_NODES_RAW = os.getenv("IGNORED_NODES", "")
+IGNORED_NODE_IDS = set()
+IGNORED_NODE_PATTERNS = []
+
+for item in IGNORED_NODES_RAW.split(","):
+    item = item.strip()
+    if not item:
+        continue
+    if item.startswith("!"):
+        # Hex ID - convert to decimal
+        try:
+            IGNORED_NODE_IDS.add(int(item[1:], 16))
+        except ValueError:
+            pass
+    elif item.isdigit():
+        # Decimal node ID
+        IGNORED_NODE_IDS.add(int(item))
+    else:
+        # Shortname pattern
+        IGNORED_NODE_PATTERNS.append(re.compile(re.escape(item), re.IGNORECASE))
+
+logger.info(f"Ignored node IDs: {IGNORED_NODE_IDS}")
+logger.info(f"Ignored patterns: {[p.pattern for p in IGNORED_NODE_PATTERNS]}")
+
+def is_wx_request(text):
+    """Check if text contains both 'ibot' AND ('wx' OR 'meteo')"""
+    return IBOT_PATTERN.search(text) and WX_PATTERN.search(text)
+
+def is_node_ignored(node_id, shortname="", db=None):
+    """Check if node should be completely ignored.
+    If node matches a pattern, save its ID to database for permanent ban."""
+    # Check by node ID from .env
+    if node_id in IGNORED_NODE_IDS:
+        return True
+
+    # Check by node ID from database ban list
+    if db and "banned_nodes" in db:
+        if str(node_id) in db["banned_nodes"]:
+            return True
+
+    # Check shortname against patterns
+    if shortname:
+        for pattern in IGNORED_NODE_PATTERNS:
+            if pattern.search(shortname):
+                # Found match! Save node_id to database for permanent ban
+                if db is not None:
+                    add_to_ban_list(db, node_id, shortname, pattern.pattern)
+                return True
+    return False
+
+def add_to_ban_list(db, node_id, shortname, matched_pattern):
+    """Add node to permanent ban list in database"""
+    if "banned_nodes" not in db:
+        db["banned_nodes"] = {}
+
+    node_id_str = str(node_id)
+    if node_id_str not in db["banned_nodes"]:
+        db["banned_nodes"][node_id_str] = {
+            "shortname": shortname,
+            "matched_pattern": matched_pattern,
+            "banned_at": datetime.now().isoformat(),
+            "hex_id": f"!{node_id:08x}"
+        }
+        save_database(db)
+        logger.warning(f"BANNED: Node {shortname} ({node_id_str} / !{node_id:08x}) added to permanent ban list (matched: {matched_pattern})")
 
 # Database
 DB_PATH = Path(__file__).parent / "nodes.json"
@@ -116,6 +185,107 @@ def get_channel_from_topic(topic):
         return parts[4]  # radioamator, LongFast, mqtt, etc.
     return "unknown"
 
+def get_weather_data(db, max_chars=200):
+    """Get weather data from nodes with recent telemetry (< 90 minutes)
+    Returns list of message chunks (max 2 messages of 200 chars each)"""
+    MAX_AGE_MINUTES = 90
+    now = datetime.now()
+    weather_reports = []
+
+    for node_id_str, node in db["nodes"].items():
+        shortname = node.get("shortname", "")
+
+        # Skip ignored/banned nodes
+        try:
+            node_id_int = int(node_id_str)
+        except ValueError:
+            continue
+        if is_node_ignored(node_id_int, shortname, db):
+            continue
+
+        telemetry = node.get("telemetry")
+        if not telemetry:
+            continue
+
+        # Check if we have temperature
+        temp = telemetry.get("temperature")
+        if temp is None:
+            continue
+
+        # Check data age
+        last_update = telemetry.get("last_update")
+        if not last_update:
+            continue
+
+        try:
+            update_time = datetime.fromisoformat(last_update)
+            age_minutes = (now - update_time).total_seconds() / 60
+
+            if age_minutes > MAX_AGE_MINUTES:
+                continue
+
+            # Format age - compact
+            if age_minutes < 1:
+                age_str = "0m"
+            elif age_minutes < 60:
+                age_str = f"{int(age_minutes)}m"
+            else:
+                age_str = f"{int(age_minutes / 60)}h{int(age_minutes % 60)}m"
+
+            # Get node name
+            if not shortname:
+                shortname = f"!{node_id_int:08x}"
+
+            # Build weather string - compact format with pressure
+            wx_str = f"{shortname}:{temp:.1f}C"
+
+            humidity = telemetry.get("relative_humidity")
+            if humidity is not None:
+                wx_str += f",{humidity:.0f}%"
+
+            pressure = telemetry.get("barometric_pressure")
+            if pressure is not None:
+                wx_str += f",{pressure:.0f}hPa"
+
+            wx_str += f"({age_str})"
+            weather_reports.append((age_minutes, wx_str))
+
+        except (ValueError, TypeError):
+            continue
+
+    if not weather_reports:
+        return None
+
+    # Sort by age (freshest first)
+    weather_reports.sort(key=lambda x: x[0])
+
+    # Build response chunks (max 2 messages of 200 chars each)
+    chunks = []
+    current_chunk = []
+    current_len = 7  # "Meteo: " prefix
+
+    for _, report in weather_reports:
+        separator = " | " if current_chunk else ""
+        needed = len(separator) + len(report)
+
+        if current_len + needed <= max_chars:
+            current_chunk.append(report)
+            current_len += needed
+        elif len(chunks) == 0:
+            # Start second chunk
+            if current_chunk:
+                chunks.append(current_chunk)
+            current_chunk = [report]
+            current_len = 7 + len(report)  # "Meteo: " + report
+        else:
+            # Already have 2 chunks, stop
+            break
+
+    if current_chunk:
+        chunks.append(current_chunk)
+
+    return chunks
+
 # Global database
 db = load_database()
 
@@ -166,6 +336,20 @@ def on_message(client, userdata, msg):
         if sender_id == our_node_id:
             return
 
+        # Check if node is ignored/banned
+        # Get shortname from db OR from nodeinfo payload (for new nodes)
+        node_shortname = ""
+        if str(sender_id) in db.get("nodes", {}):
+            node_shortname = db["nodes"][str(sender_id)].get("shortname", "")
+        # Also check nodeinfo payload for new nodes
+        if msg_type == "nodeinfo" and isinstance(payload_content, dict):
+            incoming_shortname = payload_content.get("shortname", "")
+            if incoming_shortname:
+                node_shortname = incoming_shortname
+        if is_node_ignored(sender_id, node_shortname, db):
+            logger.info(f"Ignored banned node: {sender_id} ({node_shortname})")
+            return
+
         # Process nodeinfo - learn about nodes
         if msg_type == "nodeinfo" and isinstance(payload_content, dict):
             node_data = {
@@ -208,6 +392,8 @@ def on_message(client, userdata, msg):
             elif isinstance(payload_content, dict):
                 text = payload_content.get("text", "")
 
+            # Strip whitespace and check if empty
+            text = text.strip()
             if not text:
                 return
 
@@ -215,10 +401,12 @@ def on_message(client, userdata, msg):
             if text.startswith("iBOT:"):
                 return
 
-            # Deduplication - 15 seconds window to catch delayed messages via hops
+            # Deduplication - 30 seconds window, hash on first 20 chars to catch partial duplicates
             now = time.time()
-            msg_hash = hash(text)
-            if msg_hash in recent_messages and (now - recent_messages[msg_hash]) < 15:
+            # Use first 20 chars + sender to create hash (catches truncated versions)
+            dedup_key = f"{sender_id}:{text[:20] if len(text) > 20 else text}"
+            msg_hash = hash(dedup_key)
+            if msg_hash in recent_messages and (now - recent_messages[msg_hash]) < 30:
                 logger.info(f"Ignored duplicate: {text}")
                 return
             recent_messages[msg_hash] = now
@@ -300,6 +488,37 @@ async def telegram_worker(app: Application):
                     text=tg_receipt
                 )
 
+            # Check for WX/meteo request (must contain "ibot" AND "wx" or "meteo")
+            if is_wx_request(formatted_text):
+                logger.info("WX request detected!")
+                weather_chunks = get_weather_data(db, max_chars=200)
+
+                if weather_chunks:
+                    # Send each chunk as separate message (max 2)
+                    all_reports = []
+                    for chunk in weather_chunks:
+                        wx_response = "Meteo: " + " | ".join(chunk)
+                        publish_to_mqtt(wx_response)
+                        all_reports.extend(chunk)
+
+                    # Message for Telegram (with prefix, full list)
+                    tg_wx = f"[{bot_name}]: Meteo:\n" + "\n".join(all_reports)
+                    await app.bot.send_message(
+                        chat_id=CHAT_ID,
+                        message_thread_id=TOPIC_ID,
+                        text=tg_wx
+                    )
+                else:
+                    no_data_msg = "Meteo: Nu am date recente"
+                    publish_to_mqtt(no_data_msg)
+
+                    tg_no_data = f"[{bot_name}]: {no_data_msg}"
+                    await app.bot.send_message(
+                        chat_id=CHAT_ID,
+                        message_thread_id=TOPIC_ID,
+                        text=tg_no_data
+                    )
+
         except Exception as e:
             logger.error(f"Telegram Tx Error: {e}")
 
@@ -314,7 +533,30 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
 
     if thread_id == TOPIC_ID:
         logger.info(f"Telegram -> MQTT: {text}")
-        publish_to_mqtt(text)
+
+        # Check for WX request from Telegram (only needs "wx" or "meteo")
+        if WX_PATTERN.search(text):
+            logger.info("WX request from Telegram!")
+            bot_name = db["bot_config"].get("telegram_name", "iBOT")
+            weather_chunks = get_weather_data(db, max_chars=200)
+
+            if weather_chunks:
+                # Send each chunk to mesh (max 2)
+                all_reports = []
+                for chunk in weather_chunks:
+                    wx_response = "Meteo: " + " | ".join(chunk)
+                    publish_to_mqtt(wx_response)
+                    all_reports.extend(chunk)
+
+                tg_wx = f"[{bot_name}]: Meteo:\n" + "\n".join(all_reports)
+                await update.message.reply_text(tg_wx)
+            else:
+                no_data_msg = "Meteo: Nu am date recente"
+                publish_to_mqtt(no_data_msg)
+                await update.message.reply_text(f"[{bot_name}]: {no_data_msg}")
+        else:
+            # Normal message - forward to MQTT
+            publish_to_mqtt(text)
 
 def publish_to_mqtt(text):
     try:
