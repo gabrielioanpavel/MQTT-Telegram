@@ -8,12 +8,12 @@
       "hex_id": "",
       "shortname": "",
       "longname": "",
-      "last_seen": "2026-01-12T00:42:36.637016",
+      "last_seen": "2026-01-12T00:46:39.697420",
       "position": {
         "latitude": 44.413293,
         "longitude": 26.153668,
         "altitude": 102,
-        "time": "2026-01-12T00:42:36.637016"
+        "time": "2026-01-12T00:46:39.697420"
       },
       "telemetry": null
     },
@@ -21,12 +21,12 @@
       "hex_id": "!43b72b64",
       "shortname": "BEEM",
       "longname": "YO3BEE/M-Heltec WStick",
-      "last_seen": "2026-01-12T00:41:25.131918",
+      "last_seen": "2026-01-12T00:44:14.219471",
       "position": {
         "latitude": 44.4697237,
         "longitude": 26.0570937,
         "altitude": 113,
-        "time": "2026-01-12T00:41:25.131918"
+        "time": "2026-01-12T00:44:14.219471"
       },
       "telemetry": null
     },
@@ -49,29 +49,29 @@
       "hex_id": "!088a06a0",
       "shortname": "ABD1",
       "longname": "YO3ABD",
-      "last_seen": "2026-01-12T00:34:50.544023",
+      "last_seen": "2026-01-12T00:47:14.212870",
       "position": {
         "latitude": 44.447,
         "longitude": 25.985,
         "altitude": 107,
-        "time": "2026-01-12T00:30:39.516785"
+        "time": "2026-01-12T00:47:14.212870"
       },
       "telemetry": {
         "battery_level": 101,
-        "voltage": 4.24100017547607,
-        "last_update": "2026-01-12T00:34:50.544023"
+        "voltage": 4.28999996185303,
+        "last_update": "2026-01-12T00:46:27.474114"
       }
     },
     "2997347592": {
       "hex_id": "",
       "shortname": "",
       "longname": "",
-      "last_seen": "2026-01-12T00:35:21.252376",
+      "last_seen": "2026-01-12T00:47:21.831426",
       "position": {
         "latitude": 45.809664,
         "longitude": 21.2467712,
         "altitude": 10,
-        "time": "2026-01-12T00:35:21.252376"
+        "time": "2026-01-12T00:47:21.831426"
       },
       "telemetry": {
         "battery_level": 101,
@@ -83,41 +83,41 @@
       "hex_id": "!06c360dc",
       "shortname": "BEEP",
       "longname": "YO3BEE-QTH2 KN24PJ ",
-      "last_seen": "2026-01-12T00:35:46.280230",
+      "last_seen": "2026-01-12T00:45:33.967278",
       "position": {
         "latitude": 44.2344,
         "longitude": 25.2594,
         "altitude": 120,
-        "time": "2026-01-12T00:35:31.234177"
+        "time": "2026-01-12T00:45:18.919448"
       },
       "telemetry": {
         "battery_level": 101,
-        "voltage": 4.29899978637695,
-        "last_update": "2026-01-12T00:35:46.280230"
+        "voltage": 4.29199981689453,
+        "last_update": "2026-01-12T00:45:33.967278"
       }
     },
     "773158907": {
       "hex_id": "!2e1577fb",
       "shortname": "JAZF",
       "longname": "YO3JAZ-F",
-      "last_seen": "2026-01-12T00:42:21.005193",
+      "last_seen": "2026-01-12T00:48:10.972095",
       "position": null,
       "telemetry": {
         "battery_level": 101,
         "voltage": -0.00100000004749745,
-        "last_update": "2026-01-12T00:42:21.005193"
+        "last_update": "2026-01-12T00:48:10.972095"
       }
     },
     "1685994461": {
       "hex_id": "!647e3bdd",
       "shortname": "ANTP",
       "longname": "YO3ANT/P",
-      "last_seen": "2026-01-12T00:42:27.223889",
+      "last_seen": "2026-01-12T00:47:33.992654",
       "position": {
         "latitude": 44.405,
         "longitude": 26.067,
         "altitude": 100,
-        "time": "2026-01-12T00:42:27.223889"
+        "time": "2026-01-12T00:46:24.431342"
       },
       "telemetry": {
         "battery_level": 94,
@@ -129,7 +129,7 @@
       "hex_id": "!433e0370",
       "shortname": "BEET",
       "longname": "TEST Bee",
-      "last_seen": "2026-01-12T00:40:30.904455",
+      "last_seen": "2026-01-12T00:47:28.279079",
       "position": null,
       "telemetry": null
     },
@@ -137,7 +137,7 @@
       "hex_id": "",
       "shortname": "",
       "longname": "",
-      "last_seen": "2026-01-12T00:42:06.578696",
+      "last_seen": "2026-01-12T00:44:10.656261",
       "position": {
         "latitude": 44.4619,
         "longitude": 26.1331,
@@ -146,8 +146,8 @@
       },
       "telemetry": {
         "battery_level": 101,
-        "voltage": 5.1399998664856,
-        "last_update": "2026-01-12T00:42:02.250717"
+        "voltage": 5.15100002288818,
+        "last_update": "2026-01-12T00:44:10.656261"
       }
     },
     "80053476": {
@@ -166,7 +166,7 @@
       "hex_id": "!b2a74a40",
       "shortname": "2CIP",
       "longname": "YO2CIP-Cipri",
-      "last_seen": "2026-01-12T00:41:38.315515",
+      "last_seen": "2026-01-12T00:46:39.671780",
       "position": {
         "latitude": 45.80494,
         "longitude": 21.24379,
@@ -192,29 +192,29 @@
       "hex_id": "!f993a3d0",
       "shortname": "3RIO",
       "longname": "YO3RIO",
-      "last_seen": "2026-01-12T00:40:53.805385",
+      "last_seen": "2026-01-12T00:48:33.851883",
       "position": {
         "latitude": 47.141431,
         "longitude": 27.600642,
         "altitude": 50,
-        "time": "2026-01-12T00:36:33.351541"
+        "time": "2026-01-12T00:48:33.851883"
       },
       "telemetry": {
         "battery_level": 101,
-        "voltage": 4.26900005340576,
-        "last_update": "2026-01-12T00:40:53.805385"
+        "voltage": 4.26599979400635,
+        "last_update": "2026-01-12T00:48:20.678606"
       }
     },
     "1770324100": {
       "hex_id": "",
       "shortname": "",
       "longname": "",
-      "last_seen": "2026-01-12T00:34:51.026556",
+      "last_seen": "2026-01-12T00:44:55.612246",
       "position": {
         "latitude": 45.7965568,
         "longitude": 21.2074496,
         "altitude": 100,
-        "time": "2026-01-12T00:34:51.026556"
+        "time": "2026-01-12T00:44:55.612246"
       },
       "telemetry": null
     },
@@ -222,12 +222,12 @@
       "hex_id": "!da82d6bc",
       "shortname": "BAIU",
       "longname": "BOIȘTEA YO8AIU",
-      "last_seen": "2026-01-12T00:35:00.033103",
+      "last_seen": "2026-01-12T00:44:44.824208",
       "position": {
         "latitude": 47.181464,
         "longitude": 26.426971,
         "altitude": 600,
-        "time": "2026-01-12T00:32:42.515600"
+        "time": "2026-01-12T00:44:44.824208"
       },
       "telemetry": {
         "battery_level": 101,
@@ -239,12 +239,12 @@
       "hex_id": "!433d7fd0",
       "shortname": "8RXA",
       "longname": "YO8RXA-4",
-      "last_seen": "2026-01-12T00:40:55.068505",
+      "last_seen": "2026-01-12T00:43:41.961879",
       "position": {
         "latitude": 47.11998,
         "longitude": 27.5542,
         "altitude": 0,
-        "time": "2026-01-12T00:31:41.251000"
+        "time": "2026-01-12T00:43:41.961879"
       },
       "telemetry": {
         "battery_level": 94,
@@ -282,12 +282,12 @@
       "hex_id": "!4339679c",
       "shortname": "BEEN",
       "longname": "YO3BEE Tetra BabaNovac",
-      "last_seen": "2026-01-12T00:40:21.772914",
+      "last_seen": "2026-01-12T00:46:17.899147",
       "position": {
         "latitude": 44.4252575,
         "longitude": 26.1473113,
         "altitude": 163,
-        "time": "2026-01-12T00:34:25.345834"
+        "time": "2026-01-12T00:46:17.899147"
       },
       "telemetry": {
         "battery_level": 99,
@@ -312,12 +312,12 @@
       "hex_id": "!db2ac3fc",
       "shortname": "AIUF",
       "longname": "YO8AIU QTH 2",
-      "last_seen": "2026-01-12T00:41:23.524377",
+      "last_seen": "2026-01-12T00:45:20.280474",
       "position": {
         "latitude": 47.1355392,
         "longitude": 26.417152,
         "altitude": 366,
-        "time": "2026-01-12T00:41:23.524377"
+        "time": "2026-01-12T00:45:20.280474"
       },
       "telemetry": null
     },
@@ -325,12 +325,12 @@
       "hex_id": "!e0f75378",
       "shortname": "8PIC",
       "longname": "YO8PIC-NOD📌VLADENI",
-      "last_seen": "2026-01-12T00:41:23.022680",
+      "last_seen": "2026-01-12T00:47:43.759535",
       "position": {
         "latitude": 47.4181632,
         "longitude": 27.3281024,
         "altitude": 57,
-        "time": "2026-01-12T00:41:23.022680"
+        "time": "2026-01-12T00:47:43.759535"
       },
       "telemetry": null
     },
@@ -355,12 +355,12 @@
       "hex_id": "!da5e0984",
       "shortname": "IHG1",
       "longname": "🐊YO3IHG-1",
-      "last_seen": "2026-01-12T00:40:40.617493",
+      "last_seen": "2026-01-12T00:43:22.376982",
       "position": {
         "latitude": 44.4442359,
         "longitude": 26.134996,
         "altitude": 110,
-        "time": "2026-01-12T00:27:25.783954"
+        "time": "2026-01-12T00:43:22.376982"
       },
       "telemetry": null
     },
@@ -385,8 +385,13 @@
       "hex_id": "!9a65f417",
       "shortname": "IFOm",
       "longname": " YO3IFO\u0000\u0000\u0000\u0000mob.",
-      "last_seen": "2026-01-12T00:43:10.527081",
-      "position": null,
+      "last_seen": "2026-01-12T00:44:35.675031",
+      "position": {
+        "latitude": 44.3613184,
+        "longitude": 25.9981312,
+        "altitude": 94,
+        "time": "2026-01-12T00:44:35.675031"
+      },
       "telemetry": {
         "battery_level": 67,
         "voltage": 0,
@@ -433,12 +438,12 @@
       "hex_id": "!30321f34",
       "shortname": "8SHP",
       "longname": "YO8SHP-17",
-      "last_seen": "2026-01-12T00:35:11.638677",
+      "last_seen": "2026-01-12T00:47:04.752945",
       "position": {
         "latitude": 47.1453696,
         "longitude": 27.5910656,
         "altitude": 42,
-        "time": "2026-01-12T00:35:11.638677"
+        "time": "2026-01-12T00:47:04.752945"
       },
       "telemetry": {
         "battery_level": 101,
