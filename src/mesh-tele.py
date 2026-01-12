@@ -5,6 +5,8 @@ import time
 import locale
 import asyncio
 import logging
+from pathlib import Path
+from datetime import datetime
 from dotenv import load_dotenv
 
 import paho.mqtt.client as mqtt
@@ -41,6 +43,82 @@ TOPIC_ID = int(os.getenv('TOPIC_ID_1'))
 KEYWORDS = os.getenv("KEYWORDS")
 KEYWORD_PATTERN = re.compile(re.escape(KEYWORDS), re.IGNORECASE) if KEYWORDS else None
 
+# Database
+DB_PATH = Path(__file__).parent / "nodes.json"
+
+def load_database():
+    try:
+        with open(DB_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {"bot_config": {"node_hex_id": "", "telegram_name": "iBOT"}, "nodes": {}, "channels": {}}
+
+def save_database(db):
+    with open(DB_PATH, "w", encoding="utf-8") as f:
+        json.dump(db, f, indent=2, ensure_ascii=False)
+
+def update_node(db, node_id, data):
+    node_id_str = str(node_id)
+    now = datetime.now().isoformat()
+
+    if node_id_str not in db["nodes"]:
+        db["nodes"][node_id_str] = {
+            "hex_id": "",
+            "shortname": "",
+            "longname": "",
+            "last_seen": now,
+            "position": None,
+            "telemetry": None
+        }
+
+    node = db["nodes"][node_id_str]
+    node["last_seen"] = now
+
+    for key in ["hex_id", "shortname", "longname"]:
+        if key in data and data[key]:
+            node[key] = data[key]
+
+    if "position" in data:
+        node["position"] = data["position"]
+        node["position"]["time"] = now
+
+    if "telemetry" in data:
+        if node["telemetry"] is None:
+            node["telemetry"] = {}
+        node["telemetry"].update(data["telemetry"])
+        node["telemetry"]["last_update"] = now
+
+    save_database(db)
+
+def update_channel(db, channel_name):
+    if channel_name not in db["channels"]:
+        db["channels"][channel_name] = {
+            "first_seen": datetime.now().isoformat()
+        }
+        save_database(db)
+
+def get_shortname(db, node_id):
+    node_id_str = str(node_id)
+    if node_id_str in db["nodes"]:
+        shortname = db["nodes"][node_id_str].get("shortname", "")
+        if shortname:
+            return shortname
+    # Return hex ID if no shortname
+    our_node_id = get_node_id(MQTT_TOPIC_PUB)
+    if node_id == our_node_id:
+        return db["bot_config"].get("telegram_name", "iBOT")
+    return f"!{node_id:08x}"
+
+def get_channel_from_topic(topic):
+    # Extract channel name from topic like msh/EU_433/2/json/radioamator/!4339679c
+    parts = topic.split("/")
+    if len(parts) >= 5:
+        return parts[4]  # radioamator, LongFast, mqtt, etc.
+    return "unknown"
+
+# Global database
+db = load_database()
+
 message_queue = asyncio.Queue()
 mqtt_client = None
 main_loop = None
@@ -57,14 +135,16 @@ def on_connect(client, userdata, flags, rc, properties):
     client.subscribe(MQTT_TOPIC_SUB)
 
 recent_messages = {}
+BROADCAST_ID = 4294967295  # 0xFFFFFFFF
 
 def on_message(client, userdata, msg):
+    global db
     try:
         if not mqtt.topic_matches_sub(MQTT_TOPIC_SUB, msg.topic):
             return
 
-        logger.info(f"MQTT Topic: {msg.topic}")
-        logger.info(f"Raw payload: {msg.payload}")
+        channel_name = get_channel_from_topic(msg.topic)
+        update_channel(db, channel_name)
 
         payload_str = msg.payload.decode("utf-8")
         payload_dict = json.loads(payload_str)
@@ -72,71 +152,152 @@ def on_message(client, userdata, msg):
         if not isinstance(payload_dict, dict):
             return
 
+        sender_id = payload_dict.get("from", 0)
+        sender_gateway = payload_dict.get("sender", "")
+        msg_type = payload_dict.get("type", "")
+        payload_content = payload_dict.get("payload", {})
+
+        # Log for debugging sender vs from
+        if msg_type == "text":
+            logger.info(f"DEBUG: from={sender_id}, sender(gateway)={sender_gateway}, channel={channel_name}")
+
         # Ignore messages from our own node
         our_node_id = get_node_id(MQTT_TOPIC_PUB)
-        sender_id = payload_dict.get("from", 0)
-        logger.info(f"Message from {sender_id}, our node is {our_node_id}")
         if sender_id == our_node_id:
-            logger.info(f"Ignored message from own node")
             return
 
-        message_content = payload_dict.get("payload", {})
-        text = ""
-        if isinstance(message_content, str):
-            text = message_content
-        elif isinstance(message_content, dict):
-            text = message_content.get("text", "")
-
-        if not text:
+        # Process nodeinfo - learn about nodes
+        if msg_type == "nodeinfo" and isinstance(payload_content, dict):
+            node_data = {
+                "hex_id": payload_content.get("id", ""),
+                "shortname": payload_content.get("shortname", ""),
+                "longname": payload_content.get("longname", "")
+            }
+            update_node(db, sender_id, node_data)
+            logger.info(f"DB: Updated node {node_data.get('shortname', sender_id)}")
             return
 
-        # Ignore own bot messages
-        if text.startswith("iBOT:"):
-            logger.info(f"Ignored own message: {text}")
+        # Process position - learn node positions
+        if msg_type == "position" and isinstance(payload_content, dict):
+            lat = payload_content.get("latitude_i", 0) / 10000000.0
+            lon = payload_content.get("longitude_i", 0) / 10000000.0
+            alt = payload_content.get("altitude", 0)
+            if lat != 0 and lon != 0:
+                position_data = {"position": {"latitude": lat, "longitude": lon, "altitude": alt}}
+                update_node(db, sender_id, position_data)
+                logger.info(f"DB: Updated position for {get_shortname(db, sender_id)}")
             return
 
-        # Deduplication - ignore if same message in last 5 seconds
-        now = time.time()
-        msg_hash = hash(text)
-        if msg_hash in recent_messages and (now - recent_messages[msg_hash]) < 5:
-            logger.info(f"Ignored duplicate: {text}")
+        # Process telemetry - learn sensor data
+        if msg_type == "telemetry" and isinstance(payload_content, dict):
+            telemetry_data = {"telemetry": {}}
+            for key in ["temperature", "relative_humidity", "barometric_pressure", "battery_level", "voltage"]:
+                if key in payload_content:
+                    telemetry_data["telemetry"][key] = payload_content[key]
+            if telemetry_data["telemetry"]:
+                update_node(db, sender_id, telemetry_data)
+                logger.info(f"DB: Updated telemetry for {get_shortname(db, sender_id)}")
             return
-        recent_messages[msg_hash] = now
 
-        # Cleanup old entries
-        for k in list(recent_messages.keys()):
-            if now - recent_messages[k] > 60:
-                del recent_messages[k]
+        # Process text messages - all channels
+        if msg_type == "text":
 
-        logger.info(f"MQTT RX: {text} -> Sending to Telegram")
-        if main_loop:
-            main_loop.call_soon_threadsafe(
-                message_queue.put_nowait,
-                text
-            )
+            text = ""
+            if isinstance(payload_content, str):
+                text = payload_content
+            elif isinstance(payload_content, dict):
+                text = payload_content.get("text", "")
+
+            if not text:
+                return
+
+            # Ignore own bot messages
+            if text.startswith("iBOT:"):
+                return
+
+            # Deduplication - 15 seconds window to catch delayed messages via hops
+            now = time.time()
+            msg_hash = hash(text)
+            if msg_hash in recent_messages and (now - recent_messages[msg_hash]) < 15:
+                logger.info(f"Ignored duplicate: {text}")
+                return
+            recent_messages[msg_hash] = now
+
+            # Cleanup old entries
+            for k in list(recent_messages.keys()):
+                if now - recent_messages[k] > 60:
+                    del recent_messages[k]
+
+            # Format message for Telegram
+            sender_name = get_shortname(db, sender_id)
+            to_id = payload_dict.get("to", BROADCAST_ID)
+            hops_away = payload_dict.get("hops_away", 0)
+
+            # Detect if message came via mqtt or radio
+            # Convert sender gateway hex to int and compare with from
+            gateway_hex = sender_gateway.replace("!", "")
+            try:
+                gateway_id = int(gateway_hex, 16)
+            except:
+                gateway_id = 0
+
+            via = "mqtt" if gateway_id == sender_id else "radio"
+
+            if to_id == BROADCAST_ID:
+                # Broadcast message on channel
+                formatted_text = f"[{channel_name}] {sender_name} ({via}): {text}"
+            else:
+                # Private message
+                to_name = get_shortname(db, to_id)
+                formatted_text = f"[{sender_name} -> {to_name}] ({via}): {text}"
+
+            logger.info(f"MQTT RX: {formatted_text}")
+            if main_loop:
+                main_loop.call_soon_threadsafe(
+                    message_queue.put_nowait,
+                    (formatted_text, sender_name, hops_away, to_id)
+                )
 
     except Exception as e:
         logger.error(f"MQTT Rx Error: {e}")
 
 async def telegram_worker(app: Application):
+    bot_name = db["bot_config"].get("telegram_name", "iBOT")
+    logger.info("Telegram worker started")
+
     while True:
-        text = await message_queue.get()
+        msg_data = await message_queue.get()
+        logger.info(f"TG Worker received: {msg_data}")
+        formatted_text, sender_name, hops_away, to_id = msg_data
 
         try:
+            logger.info(f"Sending to Telegram: {formatted_text}")
             await app.bot.send_message(
                 chat_id=CHAT_ID,
                 message_thread_id=TOPIC_ID,
-                text=text
+                text=formatted_text
             )
+            logger.info("Telegram message sent successfully")
 
-            if KEYWORD_PATTERN and KEYWORD_PATTERN.search(text):
+            if KEYWORD_PATTERN and KEYWORD_PATTERN.search(formatted_text):
                 logger.info("Keyword match! Sending receipt.")
-                receipt = "iBOT: Receptionat!"
-                publish_to_mqtt(receipt)
+
+                # Build response based on hops
+                if hops_away == 0:
+                    hop_info = "direct"
+                else:
+                    hop_info = f"prin {hops_away} hop" if hops_away == 1 else f"prin {hops_away} hop-uri"
+
+                # Message for mesh (no prefix, node has shortname)
+                mqtt_receipt = f"Roger {sender_name}, te aud {hop_info}!"
+                publish_to_mqtt(mqtt_receipt)
+
+                # Message for Telegram (with prefix)
+                tg_receipt = f"[{bot_name}]: {mqtt_receipt}"
                 await app.bot.send_message(
                     chat_id=CHAT_ID,
                     message_thread_id=TOPIC_ID,
-                    text=receipt
+                    text=tg_receipt
                 )
 
         except Exception as e:
