@@ -327,9 +327,9 @@ def on_message(client, userdata, msg):
         msg_type = payload_dict.get("type", "")
         payload_content = payload_dict.get("payload", {})
 
-        # Log for debugging sender vs from
+        # Log for debugging - raw payload for text messages
         if msg_type == "text":
-            logger.info(f"DEBUG: from={sender_id}, sender(gateway)={sender_gateway}, channel={channel_name}")
+            logger.info(f"DEBUG RAW: gateway={sender_gateway}, from={sender_id}, payload={payload_content}")
 
         # Ignore messages from our own node
         our_node_id = get_node_id(MQTT_TOPIC_PUB)
@@ -392,6 +392,11 @@ def on_message(client, userdata, msg):
             elif isinstance(payload_content, dict):
                 text = payload_content.get("text", "")
 
+            # Check for corrupted messages (null bytes = corrupted diacritics from bad gateway)
+            if '\x00' in text:
+                logger.info(f"Skipped corrupted message from {sender_gateway}: {repr(text)}")
+                return
+
             # Strip whitespace and check if empty
             text = text.strip()
             if not text:
@@ -401,11 +406,18 @@ def on_message(client, userdata, msg):
             if text.startswith("iBOT:"):
                 return
 
-            # Deduplication - 30 seconds window, hash on first 20 chars to catch partial duplicates
+            # Deduplication - 30 seconds window
             now = time.time()
-            # Use first 20 chars + sender to create hash (catches truncated versions)
-            dedup_key = f"{sender_id}:{text[:20] if len(text) > 20 else text}"
+            # Use message ID if available, otherwise use sender + text
+            msg_id = payload_dict.get("id", 0)
+            if msg_id:
+                dedup_key = f"{sender_id}:{msg_id}"
+            else:
+                dedup_key = f"{sender_id}:{text[:20] if len(text) > 20 else text}"
             msg_hash = hash(dedup_key)
+
+            logger.info(f"DEBUG DEDUP: key={dedup_key}, hash={msg_hash}, gateway={sender_gateway}")
+
             if msg_hash in recent_messages and (now - recent_messages[msg_hash]) < 30:
                 logger.info(f"Ignored duplicate: {text}")
                 return
