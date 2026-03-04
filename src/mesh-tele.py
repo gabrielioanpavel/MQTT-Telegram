@@ -34,6 +34,8 @@ MQTT_USERNAME = os.getenv("MQTT_USERNAME")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD")
 MQTT_TOPIC_SUB = os.getenv("MQTT_TOPIC_SUBSCRIBE_1")
 MQTT_TOPIC_PUB = os.getenv("MQTT_TOPIC_PUBLISH_1")
+MQTT_TOPIC_SUB2 = os.getenv("MQTT_TOPIC_SUBSCRIBE_2")
+MQTT_TOPIC_PUB2 = os.getenv("MQTT_TOPIC_PUBLISH_2")
 QOS = 2
 
 TOKEN = os.getenv("TOKEN")
@@ -44,6 +46,7 @@ KEYWORDS = os.getenv("KEYWORDS")
 KEYWORD_PATTERN = re.compile(re.escape(KEYWORDS), re.IGNORECASE) if KEYWORDS else None
 WX_PATTERN = re.compile(r"\b(wx|meteo)\b", re.IGNORECASE)
 IBOT_PATTERN = re.compile(r"\bibot\b", re.IGNORECASE)
+TEST_PATTERN = re.compile(r"\btest\b", re.IGNORECASE)
 
 # Ignored/banned nodes from .env (completely ignored - no messages processed)
 IGNORED_NODES_RAW = os.getenv("IGNORED_NODES", "")
@@ -303,6 +306,8 @@ def on_connect(client, userdata, flags, rc, properties):
     logger.info(f"MQTT Connected (RC: {rc})")
     logger.info(f"Subscribing to {MQTT_TOPIC_SUB}")
     client.subscribe(MQTT_TOPIC_SUB)
+    logger.info(f"Subscribing to {MQTT_TOPIC_SUB2}")
+    client.subscribe(MQTT_TOPIC_SUB2)
 
 recent_messages = {}
 BROADCAST_ID = 4294967295  # 0xFFFFFFFF
@@ -310,8 +315,11 @@ BROADCAST_ID = 4294967295  # 0xFFFFFFFF
 def on_message(client, userdata, msg):
     global db
     try:
-        if not mqtt.topic_matches_sub(MQTT_TOPIC_SUB, msg.topic):
+        is_433 = mqtt.topic_matches_sub(MQTT_TOPIC_SUB, msg.topic)
+        is_868 = mqtt.topic_matches_sub(MQTT_TOPIC_SUB2, msg.topic)
+        if not is_433 and not is_868:
             return
+        freq = "433" if is_433 else "868"
 
         channel_name = get_channel_from_topic(msg.topic)
         update_channel(db, channel_name)
@@ -445,17 +453,17 @@ def on_message(client, userdata, msg):
 
             if to_id == BROADCAST_ID:
                 # Broadcast message on channel
-                formatted_text = f"[{channel_name}] {sender_name} ({via}): {text}"
+                formatted_text = f"[{freq}] [{channel_name}] {sender_name} ({via}): {text}"
             else:
                 # Private message
                 to_name = get_shortname(db, to_id)
-                formatted_text = f"[{sender_name} -> {to_name}] ({via}): {text}"
+                formatted_text = f"[{freq}] [{sender_name} -> {to_name}] ({via}): {text}"
 
             logger.info(f"MQTT RX: {formatted_text}")
             if main_loop:
                 main_loop.call_soon_threadsafe(
                     message_queue.put_nowait,
-                    (formatted_text, sender_name, hops_away, to_id)
+                    (formatted_text, sender_name, hops_away, to_id, text, sender_id, freq)
                 )
 
     except Exception as e:
@@ -468,7 +476,7 @@ async def telegram_worker(app: Application):
     while True:
         msg_data = await message_queue.get()
         logger.info(f"TG Worker received: {msg_data}")
-        formatted_text, sender_name, hops_away, to_id = msg_data
+        formatted_text, sender_name, hops_away, to_id, text, sender_id, freq = msg_data
 
         try:
             logger.info(f"Sending to Telegram: {formatted_text}")
@@ -479,7 +487,7 @@ async def telegram_worker(app: Application):
             )
             logger.info("Telegram message sent successfully")
 
-            if KEYWORD_PATTERN and KEYWORD_PATTERN.search(formatted_text):
+            if KEYWORD_PATTERN and KEYWORD_PATTERN.search(formatted_text) and to_id == BROADCAST_ID:
                 logger.info("Keyword match! Sending receipt.")
 
                 # Build response based on hops
@@ -490,10 +498,10 @@ async def telegram_worker(app: Application):
 
                 # Message for mesh (no prefix, node has shortname)
                 mqtt_receipt = f"Roger {sender_name}, te aud {hop_info}!"
-                publish_to_mqtt(mqtt_receipt)
+                publish_to_mqtt(mqtt_receipt, freq=freq)
 
                 # Message for Telegram (with prefix)
-                tg_receipt = f"[{bot_name}]: {mqtt_receipt}"
+                tg_receipt = f"[{freq}] [{bot_name}]: {mqtt_receipt}"
                 await app.bot.send_message(
                     chat_id=CHAT_ID,
                     message_thread_id=TOPIC_ID,
@@ -501,7 +509,7 @@ async def telegram_worker(app: Application):
                 )
 
             # Check for WX/meteo request (must contain "ibot" AND "wx" or "meteo")
-            if is_wx_request(formatted_text):
+            if is_wx_request(formatted_text) and to_id == BROADCAST_ID:
                 logger.info("WX request detected!")
                 weather_chunks = get_weather_data(db, max_chars=200)
 
@@ -510,11 +518,11 @@ async def telegram_worker(app: Application):
                     all_reports = []
                     for chunk in weather_chunks:
                         wx_response = "Meteo: " + " | ".join(chunk)
-                        publish_to_mqtt(wx_response)
+                        publish_to_mqtt(wx_response, freq=freq)
                         all_reports.extend(chunk)
 
                     # Message for Telegram (with prefix, full list)
-                    tg_wx = f"[{bot_name}]: Meteo:\n" + "\n".join(all_reports)
+                    tg_wx = f"[{freq}] [{bot_name}]: Meteo:\n" + "\n".join(all_reports)
                     await app.bot.send_message(
                         chat_id=CHAT_ID,
                         message_thread_id=TOPIC_ID,
@@ -522,14 +530,26 @@ async def telegram_worker(app: Application):
                     )
                 else:
                     no_data_msg = "Meteo: Nu am date recente"
-                    publish_to_mqtt(no_data_msg)
+                    publish_to_mqtt(no_data_msg, freq=freq)
 
-                    tg_no_data = f"[{bot_name}]: {no_data_msg}"
+                    tg_no_data = f"[{freq}] [{bot_name}]: {no_data_msg}"
                     await app.bot.send_message(
                         chat_id=CHAT_ID,
                         message_thread_id=TOPIC_ID,
                         text=tg_no_data
                     )
+
+            # Check for test request (broadcast only)
+            if TEST_PATTERN.search(text) and to_id == BROADCAST_ID:
+                logger.info("Test request detected!")
+                test_response = f"Test reusit! Ești în Mesh {sender_name}!"
+                publish_to_mqtt(test_response, freq=freq)
+                tg_test = f"[{freq}] [{bot_name}]: {test_response}"
+                await app.bot.send_message(
+                    chat_id=CHAT_ID,
+                    message_thread_id=TOPIC_ID,
+                    text=tg_test
+                )
 
         except Exception as e:
             logger.error(f"Telegram Tx Error: {e}")
@@ -544,42 +564,50 @@ async def handle_telegram_message(update: Update, context: ContextTypes.DEFAULT_
     text = update.message.text
 
     if thread_id == TOPIC_ID:
-        logger.info(f"Telegram -> MQTT: {text}")
+        # TELEGRAM -> MQTT DISABLED
+        # Pentru a reactiva trimiterea mesajelor din Telegram catre mesh,
+        # decomentati blocul de mai jos si stergeti linia "pass"
+        pass
 
-        # Check for WX request from Telegram (only needs "wx" or "meteo")
-        if WX_PATTERN.search(text):
-            logger.info("WX request from Telegram!")
-            bot_name = db["bot_config"].get("telegram_name", "iBOT")
-            weather_chunks = get_weather_data(db, max_chars=200)
+        # logger.info(f"Telegram -> MQTT: {text}")
 
-            if weather_chunks:
-                # Send each chunk to mesh (max 2)
-                all_reports = []
-                for chunk in weather_chunks:
-                    wx_response = "Meteo: " + " | ".join(chunk)
-                    publish_to_mqtt(wx_response)
-                    all_reports.extend(chunk)
+        # # Check for WX request from Telegram (only needs "wx" or "meteo")
+        # if WX_PATTERN.search(text):
+        #     logger.info("WX request from Telegram!")
+        #     bot_name = db["bot_config"].get("telegram_name", "iBOT")
+        #     weather_chunks = get_weather_data(db, max_chars=200)
 
-                tg_wx = f"[{bot_name}]: Meteo:\n" + "\n".join(all_reports)
-                await update.message.reply_text(tg_wx)
-            else:
-                no_data_msg = "Meteo: Nu am date recente"
-                publish_to_mqtt(no_data_msg)
-                await update.message.reply_text(f"[{bot_name}]: {no_data_msg}")
-        else:
-            # Normal message - forward to MQTT
-            publish_to_mqtt(text)
+        #     if weather_chunks:
+        #         # Send each chunk to mesh (max 2)
+        #         all_reports = []
+        #         for chunk in weather_chunks:
+        #             wx_response = "Meteo: " + " | ".join(chunk)
+        #             publish_to_mqtt(wx_response)
+        #             all_reports.extend(chunk)
 
-def publish_to_mqtt(text):
+        #         tg_wx = f"[{bot_name}]: Meteo:\n" + "\n".join(all_reports)
+        #         await update.message.reply_text(tg_wx)
+        #     else:
+        #         no_data_msg = "Meteo: Nu am date recente"
+        #         publish_to_mqtt(no_data_msg)
+        #         await update.message.reply_text(f"[{bot_name}]: {no_data_msg}")
+        # else:
+        #     # Normal message - forward to MQTT
+        #     publish_to_mqtt(text)
+
+def publish_to_mqtt(text, to_id=None, freq="433"):
     try:
-        node_id = get_node_id(MQTT_TOPIC_PUB)
+        topic_pub = MQTT_TOPIC_PUB if freq == "433" else MQTT_TOPIC_PUB2
+        node_id = get_node_id(topic_pub)
         json_msg = {
             "from": node_id,
             "payload": text,
             "type": "sendtext"
         }
+        if to_id is not None:
+            json_msg["to"] = to_id
         message_bytes = json.dumps(json_msg, ensure_ascii=False).encode("utf-8")
-        mqtt_client.publish(MQTT_TOPIC_PUB, message_bytes, qos=QOS)
+        mqtt_client.publish(topic_pub, message_bytes, qos=QOS)
     except Exception as e:
         logger.error(f"MQTT Publish Error: {e}")
 

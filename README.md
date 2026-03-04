@@ -15,7 +15,7 @@ CHAT_ID=-1001234567890
 TOPIC_ID_1=12345
 
 # MQTT Broker
-MQTT_BROKER="happybees.10net.ro"
+MQTT_BROKER="mqtt.happybees.ro"
 MQTT_PORT=1883
 MQTT_CLIENT_ID="botpi"
 MQTT_USERNAME="botpi"
@@ -99,19 +99,70 @@ IGNORED_NODES="!1c07ca4c,!da9e92b0,RVE,KOKO"
 
 ## Funcții Bot
 
-### CQ Mesh
-Răspunde automat la "cq mesh" cu confirmarea că te aude:
+> **Important:** Toate funcțiile răspund **doar pe canal (broadcast)**. Mesajele private (DM) între noduri sunt ignorate complet de bot.
+
+### Format mesaje în Telegram
+Mesajele afișate în Telegram au prefix cu frecvența rețelei:
 ```
-Roger SHORTNAME, te aud direct!
-Roger SHORTNAME, te aud prin 2 hop-uri!
+[433] [radioamator] BEEN (radio): Cq mesh
+[868] [radioamator] TM22 (mqtt): Test
+[433] [xLCC -> CHE1] (mqtt): mesaj privat
+```
+
+### CQ Mesh
+Trigger: mesaj care conține "cq mesh" sau "meshtastic" pe canal broadcast.
+
+Răspunde automat cu confirmarea că te aude:
+```
+[433] [iBOT]: Roger BEEN, te aud direct!
+[433] [iBOT]: Roger BEEN, te aud prin 2 hop-uri!
 ```
 
 ### Meteo (WX)
-Trigger: "ibot wx" sau "ibot meteo"
+Trigger: "ibot wx" sau "ibot meteo" pe canal broadcast.
 
 Răspunde cu date meteo de la nodurile cu senzori (max 90 min vechi):
 ```
-Meteo: MVO3:-5.5C,83%,1017hPa(22m) | IHG2:24.0C,31%,1015hPa(45m)
+[433] [iBOT]: Meteo: MVO3:-5.5C,83%,1017hPa(22m) | IHG2:24.0C,31%,1015hPa(45m)
+```
+
+### Test
+Trigger: mesaj care conține "test" pe canal broadcast.
+
+Răspunde cu confirmarea că nodul este în mesh:
+```
+[433] [iBOT]: Test reusit! Ești în Mesh BEEN!
+```
+
+---
+
+## Trimitere mesaje din Telegram spre Mesh
+
+### Status: DEZACTIVAT
+
+Funcția de trimitere a mesajelor din Telegram spre rețeaua mesh este momentan dezactivată.
+
+### Cum se reactivează:
+Editează `src/mesh-tele.py` și găsește funcția `handle_telegram_message`.
+Decomentează blocul marcat cu `# TELEGRAM -> MQTT DISABLED` și șterge linia `pass`:
+
+```python
+# Înainte (dezactivat):
+if thread_id == TOPIC_ID:
+    # TELEGRAM -> MQTT DISABLED
+    pass
+    # logger.info(...)
+    # ...
+
+# După (activat) - decomentează și șterge pass:
+if thread_id == TOPIC_ID:
+    logger.info(f"Telegram -> MQTT: {text}")
+    # ...
+```
+
+Apoi restart:
+```bash
+sudo systemctl restart mesh-tele
 ```
 
 ---
